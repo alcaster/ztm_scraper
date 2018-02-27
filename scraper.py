@@ -13,6 +13,11 @@ def url(beginning: int):
     return "http://www.ztm.waw.pl/zmiany.php?c=102&a=1&p={}&k=0&l=1".format(beginning)
 
 
+class NoImageException(Exception):
+    """Happens whenever there is no image to extract information about type"""
+    pass
+
+
 def split_period(period: str) -> tuple:
     from_ = None
     to_ = None
@@ -38,7 +43,10 @@ def split_period(period: str) -> tuple:
 def get_data_from_sample(sample) -> tuple:
     id = sample.get("id")
     data = [i for i in sample]
-    type = data[0].next["alt"]
+    try:
+        type = data[0].next["alt"]
+    except KeyError:
+        raise NoImageException("There is no image")
     period = data[1].text
     period, from_, to_ = split_period(period)
 
@@ -61,12 +69,12 @@ def _scrape(beg, end):
         samples = soup.find_all("tr")
 
         for sample in samples:
-            print(sample)
             try:
                 entry = get_data_from_sample(sample)
-            except Exception as e:
-                print("Exception ! - {}".format(e))
+            except NoImageException:
                 continue
+            except Exception as e:
+                print("Problem with page:{},error - {}".format(page, e))
             df.loc[df_idx] = entry
             df_idx += 1
     return df
@@ -83,7 +91,8 @@ def get_scraped_csv(name, beg, end):
 
 
 def main():
-    get_scraped_csv("data.csv", beg, end)
+    namefile = "data.csv"
+    get_scraped_csv("data/{}".format(namefile), beg, end)
 
 
 if __name__ == '__main__':
