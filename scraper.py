@@ -6,12 +6,14 @@ from datetime import datetime
 import re
 
 beg = 1
-end = 372
+end = 371
 
 
 def url(beginning: int):
     return "http://www.ztm.waw.pl/zmiany.php?c=102&a=1&p={}&k=0&l=1".format(beginning)
 
+def info_url(idx: int):
+    return "http://www.ztm.waw.pl/zmiany.php?c=102&i={}".format(idx)
 
 class NoImageException(Exception):
     """Happens whenever there is no image to extract information about type"""
@@ -42,6 +44,9 @@ def split_period(period: str) -> tuple:
 
 def get_data_from_sample(sample) -> tuple:
     id = sample.get("id")
+    int_id = re.findall("komunikat_(\d+)_", id)
+    if int_id:
+        id = int_id[0]
     data = [i for i in sample]
     try:
         type = data[0].next["alt"]
@@ -51,11 +56,11 @@ def get_data_from_sample(sample) -> tuple:
     period, from_, to_ = split_period(period)
 
     description = data[2].text
-    return id, type, period, from_, to_, description
+    return id, type, period, from_, to_, description, info_url(id)
 
 
 def _scrape(beg, end):
-    columns = ["id", "type", "period", "from", "to", "description"]
+    columns = ["id", "type", "period", "from", "to", "description", "url"]
 
     df = pd.DataFrame(columns=columns)
     df_idx = 0
