@@ -9,11 +9,13 @@ beg = 1
 end = 371
 
 
-def url(beginning: int):
+def newsfeed_url(beginning: int):
     return "http://www.ztm.waw.pl/zmiany.php?c=102&a=1&p={}&k=0&l=1".format(beginning)
+
 
 def info_url(idx: int):
     return "http://www.ztm.waw.pl/zmiany.php?c=102&i={}".format(idx)
+
 
 class NoImageException(Exception):
     """Happens whenever there is no image to extract information about type"""
@@ -59,14 +61,25 @@ def get_data_from_sample(sample) -> tuple:
     return id, type, period, from_, to_, description, info_url(id)
 
 
+def get_content_without_tags(url: str):
+    result = requests.get(url)
+    if result.status_code != 200:
+        return
+    c = result.content
+    soup = BeautifulSoup(c, "lxml")
+    samples = soup.find(id="PageContent")
+    text = '\n'.join([i.text for i in samples.find_all(['p', 'ul'])])
+    return text
+
+
 def _scrape(beg, end):
-    columns = ["id", "type", "period", "from", "to", "description", "url"]
+    columns = ["id", "type", "from", "to", "title", "url", "content"]
 
     df = pd.DataFrame(columns=columns)
     df_idx = 0
 
     for page in tqdm(range(beg, end)):
-        result = requests.get(url(page))
+        result = requests.get(newsfeed_url(page))
         if result.status_code != 200:
             break
         c = result.content
@@ -75,13 +88,15 @@ def _scrape(beg, end):
 
         for sample in samples:
             try:
-                entry = get_data_from_sample(sample)
+                id, type, period, from_, to_, description, message_url = get_data_from_sample(sample)
+                content = get_content_without_tags(message_url)
+                entry = [id, type, from_, to_, description, message_url, content]
+                df.loc[df_idx] = entry
+                df_idx += 1
             except NoImageException:
                 continue
             except Exception as e:
                 print("Problem with page:{},error - {}".format(page, e))
-            df.loc[df_idx] = entry
-            df_idx += 1
     return df
 
 
